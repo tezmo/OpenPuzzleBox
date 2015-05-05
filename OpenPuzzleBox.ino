@@ -1,5 +1,3 @@
-
-
 #include "AnythingEEPROM.h"
 #include "bitmaps.h"
 #include <EEPROM.h>
@@ -32,6 +30,8 @@ PWMServo        servo;
 PowerPin        servo_power(6);
 PowerPin        backlight(13);
 Button          button(4); 
+long            previousMillis = 0;            // previous checked time
+int             ani;
 
 
 struct Waypoint {
@@ -58,29 +58,28 @@ void setup() {
 }
 
 void loop() {
-  enum: char {
-                 CRASHED,
-     SELECT_ROUTE_SETUP,  SELECT_ROUTE,
-     SELECT_TRIES_SETUP,  SELECT_TRIES,
-            CLOSE_SETUP,  CLOSE,
-     WAIT_FOR_FIX_SETUP,  WAIT_FOR_FIX,
-         WAYPOINT_SETUP,  WAYPOINT,
-        WAYPOINT_UPDATE,  WAYPOINT_DONE,
-             FAIL_SETUP,  FAIL,
-          PROGRAM_SETUP,
-    PROGRAM_YESNO_SETUP,  PROGRAM_YESNO,
-        PROGRAM_UPDATE,   PROGRAM,
-            ROUTE_DONE,   PROGRAM_DONE
+  static enum:char {
+                                               CRASHED,
+     SELECT_ROUTE_SETUP,  SELECT_ROUTE_UPDATE, SELECT_ROUTE,
+     SELECT_TRIES_SETUP,  SELECT_TRIES_UPDATE, SELECT_TRIES,
+            CLOSE_SETUP,                       CLOSE,
+     WAIT_FOR_FIX_SETUP,  WAIT_FOR_FIX_UPDATE, WAIT_FOR_FIX,
+            ROUTE_SETUP,                                      ROUTE_DONE,
+         WAYPOINT_SETUP,      WAYPOINT_UPDATE, WAYPOINT,      WAYPOINT_DONE,
+             FAIL_SETUP,                       FAIL,
+    PROGRAM_YESNO_SETUP,                       PROGRAM_YESNO,
+          PROGRAM_SETUP,       PROGRAM_UPDATE, PROGRAM,       PROGRAM_DONE
   } state = SELECT_ROUTE_SETUP;
 
   static byte          route, waypoint, tries_left, triesidx;
   static byte          dotstate = 0;
-  static boolean       programming = false, yesno, full;
+  static boolean       programming = false, yesno;
   static unsigned long fix = 0;
   static float         distance;
   static Waypoint      there;
   static float         here_lat, here_lon;
   static int           last;
+  
 
   backlight.check();
   servo_power.check();
@@ -102,31 +101,35 @@ void loop() {
     }
   }
   
-  switch (state) {
+switch (state) {
     case CRASHED: break;
     
     case SELECT_ROUTE_SETUP: {
       open_lock();;
       route = 1;
-
       display.clearDisplay();
-      set_text(0,0,"Choose route: ",BLACK);
-      set_text(0,8,"Route #: ",BLACK);
+      display.print("Choose route.\nRoute #\n\n\nnext        OKshort     long");
+      display.display();
+      state = SELECT_ROUTE_UPDATE;
+      break;  
+    }
+    
+    case SELECT_ROUTE_UPDATE: {
+      display.fillRect(42,8,6,8,WHITE);
+      display.setCursor(42,8);
       display.print(route, DEC);
-      set_text(0,32,"next        OK",BLACK);
-      set_text(0,40,"short     long",BLACK);
+      display.print(" ");
       display.display();      
-
       state = SELECT_ROUTE;
       break;
     }
     
-     case SELECT_ROUTE: {
+    case SELECT_ROUTE: {
       switch (button.pressed()) {
         case SHORT:
           route++;
           if (route > MAX_ROUTE) route = 1;
-          state = SELECT_ROUTE;
+          state = SELECT_ROUTE_UPDATE;
           break;
         case LONG:
           state = SELECT_TRIES_SETUP;
@@ -134,29 +137,32 @@ void loop() {
       }
       break;
     }
-    
+ 
     case SELECT_TRIES_SETUP: {
       triesidx = 0;
-  
       display.clearDisplay();
-      set_text(0,0,"Choose level. ",BLACK);
+      display.print("Choose level.\n\n\n\nnext        OKshort     long");
+      display.display();
+      state = SELECT_TRIES_UPDATE;
+      break;  
+    }
+    
+    case SELECT_TRIES_UPDATE: {
+      display.fillRect(0,8,12,8,WHITE);    
       display.setCursor(0,8);
       display.print(TRIES[triesidx], DEC);
       display.print(" attempts  ");
-      set_text(0,32,"next        OK",BLACK);
-      set_text(0,40,"short     long",BLACK);
       display.display();
-  
-      state = SELECT_TRIES;  
+      state = SELECT_TRIES;
+      break;
     }
-    
     
     case SELECT_TRIES: {
       switch (button.pressed()) {
         case SHORT:
           triesidx++;
           if (triesidx >= sizeof(TRIES)) triesidx = 0;
-          state = SELECT_TRIES;
+          state = SELECT_TRIES_UPDATE;
           break;
         case LONG:
           state = CLOSE_SETUP;
@@ -167,12 +173,13 @@ void loop() {
     
     case CLOSE_SETUP: {
       display.clearDisplay();
-      set_text(0,0,"Can the box be",BLACK);
+      display.print("Can the box be");
       display.setTextSize(2);
-      set_text(0,8,"LOCKED?",BLACK);
-      display.setTextSize(1);      
-      set_text(0,32,"            OK",BLACK);
-      set_text(0,40,"          long",BLACK);
+      display.setCursor(0,12);
+      display.print("locked?");
+      display.setTextSize(1);
+      display.setCursor(0,32);
+      display.print("            OK          long");
       display.display();
       state = CLOSE;
       break;
@@ -184,37 +191,34 @@ void loop() {
       state = WAIT_FOR_FIX_SETUP;
       break;
     }
-    
-    
+ 
     case WAIT_FOR_FIX_SETUP: {
       fix = 0;
       backlight.off(5000);
       display.clearDisplay();
-      
-      set_text(0,0,"Wait for",BLACK);
-      set_text(0,8,"GPS-fix.",BLACK);
-     
-      if (last - millis() > 500){
-        if (full){
-          display.fillCircle(43, 23, 4, WHITE);
-          display.drawCircle(43, 23, 4, BLACK);
-          full =false;
-        }
-        else{
-          display.fillCircle(43, 23, 4, BLACK);
-          full = true;
-        }
-      last = millis();
-      }
+      display.print("Wait for good\nGPS signal.");
+      display.drawTriangle(30,35,45,42,51,21,BLACK);
       display.display();
+      state = WAIT_FOR_FIX_UPDATE;
+      break;
+    }
+      
+    case WAIT_FOR_FIX_UPDATE: {
+      
+      
+      if (millis()-previousMillis>1000){
+           ani = (ani) ? 0 : 1;
+           display.fillTriangle(31,35,44,41,50,22,ani);
+           previousMillis = millis();
+           display.display();
+            
+      }
+    
       state = WAIT_FOR_FIX;
       break;
     }
     
-// UP TO HERE    
-    
-    
-     case WAIT_FOR_FIX: {
+    case WAIT_FOR_FIX: {
       switch(button.pressed()) {
         case SHORT:
           backlight.off(1500);
@@ -223,61 +227,62 @@ void loop() {
           state = PROGRAM_YESNO_SETUP;
           break;
         default:
-          // to be placed in TinyGPS++ instead
           if (fix && gps.hor_acc() < 500 && millis() - fix > 2000)
-            state = programming ? PROGRAM_SETUP : WAYPOINT_SETUP;
-          else {
-            state = WAIT_FOR_FIX_SETUP;
-          }
+            state = programming ? PROGRAM_SETUP : ROUTE_SETUP;
+          else 
+            state = WAIT_FOR_FIX_UPDATE;
       }
       break;
-    }   
-    
-    
-    case WAYPOINT_SETUP: {
+    }
+      
+    case ROUTE_SETUP: {
       waypoint = 1;
+      state = WAYPOINT_SETUP;
+      break;
+    }
+      
+    case WAYPOINT_SETUP: {
+      display.clearDisplay();
+      display.print("En route to\nwaypoint ");
+      display.print(waypoint, DEC);
+      display.display();
       EEPROM_readAnything(address_for(route, waypoint), there);
       tries_left = TRIES[triesidx];
       distance   = -1;
       state = there.lat ? WAYPOINT_UPDATE : ROUTE_DONE;
       break;
     }
- 
- 
-     case WAYPOINT_UPDATE: {
+    
+    case WAYPOINT_UPDATE: {
       backlight.off(15000);
       if (distance >= 0) {
-        display.clearDisplay();
-        display.print("En route to  waypoint ");
-        display.print(waypoint, DEC);
-      
         display.setCursor(0, 16);
         display.print("Distance:\n");
+        display.fillRect(0,24,24,8,WHITE);
+        display.setCursor(0, 24);
         display.print(distance, 0);
-        display.print("m    ");
+        display.setCursor(30, 24);
+        display.print("m");
         display.display();
       }
-      display.clearDisplay();
-      display.print("En route to  waypoint ");
-      display.print(waypoint, DEC);
- 
-      display.setCursor(0, 24);
+      display.setCursor(0, 32);
       display.print("You have ");
+      display.fillRect(54,32,12,8,WHITE);  
       display.print(tries_left, DEC);
       display.print(" \nattempts left.");
       display.display();
       state = WAYPOINT;
       break;
-    }   
-    
-  
+    }
+      
     case WAYPOINT: {
       if (distance < 0 || !button.pressed()) break;
-      state = distance <= there.tolerance ? CRASHED
+      state = distance <= there.tolerance ? WAYPOINT_DONE
             : --tries_left                ? WAYPOINT_UPDATE
-            :                               CRASHED;
+            :                               FAIL_SETUP;
       break;
-    }    
+    }
+    
     case WAYPOINT_DONE: {
       display.clearDisplay();
       backlight.off();
@@ -299,7 +304,7 @@ void loop() {
       display.clearDisplay();
       backlight.off(10000);
       open_lock();
-      display.print("Congrats!");
+      display.print("Congrats!\n");
       display.print("You made it! :)");
       display.display();
       state = CRASHED;
@@ -329,12 +334,15 @@ void loop() {
           open_lock();  // backdoor
           break;
       }
-      display.print("\r");
+      display.fillRect(0,24,30,8,WHITE);
       display.print(distance, 0);
+      display.setCursor(36, 24);
       display.print(" m     ");
       display.display();
       break;
     }
+    
+// THIS FAR   
     
     case PROGRAM_YESNO_SETUP: {
       open_lock();  // Pre-game backdoor
@@ -344,7 +352,7 @@ void loop() {
       display.print("Route ");
       display.print(route, DEC);
       display.print("\nprogram? ");
-      display.setCursor(0,24);
+      display.setCursor(0,32);
       display.print("back        OKshort     long");
       display.display();
       state = PROGRAM_YESNO;
@@ -430,16 +438,19 @@ void loop() {
       programming = false;
       state = SELECT_ROUTE_SETUP;
       break;
-    }    
-    
+    }
   }
   delay(10);  
 }
 
 void intro() {
   display.clearDisplay();
-  display.drawBitmap(0, 0, splash, 84, 48, BLACK);
+  display.setTextSize(3);
+  set_text(4,1,"REV",BLACK);
+  set_text(24,25,"GEO",BLACK);
+  display.setTextSize(1);
   display.display();
+  delay(3000);
 }
 
 void set_text(int x,int y,String text,int color){
@@ -463,5 +474,4 @@ void close_lock() {
 int address_for(byte route, byte waypoint) {
   return (route - 1) * 100 + (waypoint - 1) * 10;
 }
-
 
