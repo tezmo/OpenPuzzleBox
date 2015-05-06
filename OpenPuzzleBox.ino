@@ -44,13 +44,11 @@ void setup() {
   servo.attach(10);
   nss.begin(9600);
   delay(500);
-
   display.begin();
+  display.clearDisplay();
   display.setContrast(30);
   display.clearDisplay();
-
   intro();
-   
 }
 
 void loop() {
