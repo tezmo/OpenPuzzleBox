@@ -14,7 +14,7 @@
 const byte MAX_WAYPOINT  = 10;
 const byte MAX_ROUTE     = 10;
 const byte TRIES[]       = { 6, 12, 18 };
-const byte TOLERANCE[]   = { 10, 25, 40 };
+const byte TOLERANCE[]   = { 30, 20, 10 };
 
 // PCD8544( SCLK, DIN, D/C, CS, RST)
 Adafruit_PCD8544 display = Adafruit_PCD8544(12, 11, 9, 7, 8);
@@ -106,7 +106,8 @@ switch (state) {
         case LONG:
           state = SELECT_ROUTE_SETUP;
           break;
-       }          
+       }
+      break;       
      }
     
     case SELECT_ROUTE_SETUP: {
@@ -461,7 +462,6 @@ switch (state) {
         case SHORT:
           there.lat = here_lat;
           there.lon = here_lon;  
-          //there.tolerance = 30;  // FIXME
           there.flags = 0;  // FIXME
           EEPROM_writeAnything(address_for(route, waypoint), there);
           state = ++waypoint > MAX_WAYPOINT ? PROGRAM_DONE : PROGRAM_UPDATE;
