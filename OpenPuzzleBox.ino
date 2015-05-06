@@ -1,17 +1,13 @@
 #include "AnythingEEPROM.h"
-#include "bitmaps.h"
 #include <EEPROM.h>
 #include <PWMServo.h>
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_PCD8544.h>
 #include <SoftwareSerial.h>
-
-// to be replaced
 #include <TinyGPS.h>
-#include <TinyGPS++.h>
 
-// Juerd Waalboer - https://github.com/revspace/airhockey/tree/2bb4cf1c4dbf15a13e4d3c9a125fea36f564c969/libraries
+// Juerd Waalboer - https://github.com/revspace/airhockey
 #include <PowerPin.h>
 #include <Button.h>
 
@@ -196,7 +192,7 @@ switch (state) {
       fix = 0;
       backlight.off(5000);
       display.clearDisplay();
-      display.print("Wait for good\nGPS signal.");
+      display.print("Wait for \nGPS signal.");
       display.drawTriangle(30,35,45,42,51,21,BLACK);
       display.display();
       state = WAIT_FOR_FIX_UPDATE;
@@ -211,9 +207,7 @@ switch (state) {
            display.fillTriangle(31,35,44,41,50,22,ani);
            previousMillis = millis();
            display.display();
-            
       }
-    
       state = WAIT_FOR_FIX;
       break;
     }
@@ -318,7 +312,7 @@ switch (state) {
       while (there.lat && waypoint <= MAX_WAYPOINT)
         EEPROM_readAnything(address_for(route, ++waypoint), there);
       EEPROM_readAnything(address_for(route, --waypoint), there);
-      display.setCursor(0, 8);
+      display.setCursor(0, 16);
       display.print("Distance to\nend goal:\n");
       display.display();
       state = FAIL;
@@ -334,9 +328,10 @@ switch (state) {
           open_lock();  // backdoor
           break;
       }
-      display.fillRect(0,24,30,8,WHITE);
+      display.fillRect(0,32,30,8,WHITE);
+      display.setCursor(0, 32);
       display.print(distance, 0);
-      display.setCursor(36, 24);
+      display.setCursor(36, 32);
       display.print(" m     ");
       display.display();
       break;
@@ -444,13 +439,22 @@ switch (state) {
 }
 
 void intro() {
-  display.clearDisplay();
   display.setTextSize(3);
-  set_text(4,1,"REV",BLACK);
-  set_text(24,25,"GEO",BLACK);
+  
+  for (int i=0;i<3;i++){
+    display.clearDisplay();
+    set_text(4,1,"REV",BLACK);
+    set_text(24,25,"GEO",BLACK);
+    display.display();
+    delay(250);
+    display.fillRect(0,0,display.width(),display.height(),BLACK);
+    set_text(4,1,"REV",WHITE);
+    set_text(24,25,"GEO",WHITE);
+    display.display();
+    delay(250);
+  }
   display.setTextSize(1);
-  display.display();
-  delay(3000);
+  display.setTextColor(BLACK);
 }
 
 void set_text(int x,int y,String text,int color){
