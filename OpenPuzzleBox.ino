@@ -11,9 +11,10 @@
 #include <PowerPin.h>
 #include <Button.h>
 
-const byte MAX_WAYPOINT  = 9;
-const byte MAX_ROUTE     = 9;
-const byte TRIES[]       = { 15, 25, 35 };
+const byte MAX_WAYPOINT  = 10;
+const byte MAX_ROUTE     = 10;
+const byte TRIES[]       = { 6, 12, 18 };
+const byte TOLERANCE[]   = { 10, 25, 40 };
 
 // PCD8544( SCLK, DIN, D/C, CS, RST)
 Adafruit_PCD8544 display = Adafruit_PCD8544(12, 11, 9, 7, 8);
@@ -21,7 +22,6 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(12, 11, 9, 7, 8);
 SoftwareSerial  nss(/*RX*/2, /*TX*/14);
 TinyGPS         gps;
 PWMServo        servo;
-
 
 PowerPin        servo_power(6);
 PowerPin        backlight(13);
@@ -56,6 +56,8 @@ void loop() {
                                                CRASHED,
      SELECT_ROUTE_SETUP,  SELECT_ROUTE_UPDATE, SELECT_ROUTE,
      SELECT_TRIES_SETUP,  SELECT_TRIES_UPDATE, SELECT_TRIES,
+ SELECT_TOLERANCE_SETUP,                       SELECT_TOLERANCE_UPDATE, 
+       SELECT_TOLERANCE,
             CLOSE_SETUP,                       CLOSE,
      WAIT_FOR_FIX_SETUP,  WAIT_FOR_FIX_UPDATE, WAIT_FOR_FIX,
             ROUTE_SETUP,                                      ROUTE_DONE,
@@ -65,7 +67,7 @@ void loop() {
           PROGRAM_SETUP,       PROGRAM_UPDATE, PROGRAM,       PROGRAM_DONE
   } state = SELECT_ROUTE_SETUP;
 
-  static byte          route, waypoint, tries_left, triesidx;
+  static byte          route, waypoint, tries_left, triesidx, tolidx;
   static byte          dotstate = 0;
   static boolean       programming = false, yesno;
   static unsigned long fix = 0;
@@ -96,7 +98,16 @@ void loop() {
   }
   
 switch (state) {
-    case CRASHED: break;
+    case CRASHED: {
+       switch(button.pressed(5000)) {
+        case SHORT:
+          backlight.off(1500);
+          break;
+        case LONG:
+          state = SELECT_ROUTE_SETUP;
+          break;
+       }          
+     }
     
     case SELECT_ROUTE_SETUP: {
       open_lock();;
@@ -145,7 +156,8 @@ switch (state) {
       display.fillRect(0,8,12,8,WHITE);    
       display.setCursor(0,8);
       display.print(TRIES[triesidx], DEC);
-      display.print(" attempts  ");
+      display.setCursor(18,8);
+      display.print("attempts  ");
       display.display();
       state = SELECT_TRIES;
       break;
@@ -159,11 +171,45 @@ switch (state) {
           state = SELECT_TRIES_UPDATE;
           break;
         case LONG:
-          state = CLOSE_SETUP;
+          state = SELECT_TOLERANCE_SETUP;
           break;
       }
       break;
     }
+ 
+    case SELECT_TOLERANCE_SETUP: {
+      tolidx = 0;
+      display.clearDisplay();
+      display.print("Tolerance:\n\n\n\nnext        OKshort     long");
+      display.display();
+      state = SELECT_TOLERANCE_UPDATE;
+      break;  
+    }
+   
+    case SELECT_TOLERANCE_UPDATE: {
+      display.fillRect(0,8,12,8,WHITE);    
+      display.setCursor(0,8);
+      display.print(TOLERANCE[tolidx], DEC);
+      display.print(" meters  ");
+      display.display();
+      state = SELECT_TOLERANCE;
+      break;
+    }
+    
+    case SELECT_TOLERANCE: {
+      switch (button.pressed()) {
+        case SHORT:
+          tolidx++;
+          if (tolidx >= sizeof(TOLERANCE)) tolidx = 0;
+          state = SELECT_TOLERANCE_UPDATE;
+          break;
+        case LONG:
+          state = CLOSE_SETUP;
+          break;
+      }
+      break;
+    } 
+ 
     
     case CLOSE_SETUP: {
       display.clearDisplay();
@@ -240,6 +286,7 @@ switch (state) {
       display.display();
       EEPROM_readAnything(address_for(route, waypoint), there);
       tries_left = TRIES[triesidx];
+      there.tolerance = TOLERANCE[tolidx];
       distance   = -1;
       state = there.lat ? WAYPOINT_UPDATE : ROUTE_DONE;
       break;
@@ -414,7 +461,7 @@ switch (state) {
         case SHORT:
           there.lat = here_lat;
           there.lon = here_lon;  
-          there.tolerance = 30;  // FIXME
+          //there.tolerance = 30;  // FIXME
           there.flags = 0;  // FIXME
           EEPROM_writeAnything(address_for(route, waypoint), there);
           state = ++waypoint > MAX_WAYPOINT ? PROGRAM_DONE : PROGRAM_UPDATE;
