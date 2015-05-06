@@ -221,7 +221,7 @@ switch (state) {
           state = PROGRAM_YESNO_SETUP;
           break;
         default:
-          if (fix && gps.hor_acc() < 500 && millis() - fix > 2000)
+          if (fix && gps.hdop() < 500 && millis() - fix > 2000)
             state = programming ? PROGRAM_SETUP : ROUTE_SETUP;
           else 
             state = WAIT_FOR_FIX_UPDATE;
@@ -298,8 +298,10 @@ switch (state) {
       display.clearDisplay();
       backlight.off(10000);
       open_lock();
-      display.print("Congrats!\n");
-      display.print("You made it! :)");
+      display.setTextSize(2);
+      display.print("Yaaaay!\n");
+      display.setTextSize(1);
+      display.print("  The box is \n   now open.");
       display.display();
       state = CRASHED;
       break;
@@ -377,16 +379,16 @@ switch (state) {
     case PROGRAM_UPDATE: {
       backlight.off(15000);
       display.clearDisplay();
-      display.print("Go to\nwaypoint ");
+      display.print("Go to WP #");
       display.print(waypoint, DEC);
-      display.print(".\nReached:\n\n");
-      display.display();
+      display.print(".\n\nSignal: \n");
       if (waypoint > 1) {
         display.print("\nWP ");
         display.print(waypoint - 1, DEC);
         display.print(" -> here:\n");
         display.display();
       }
+      display.display();
       state = PROGRAM;
       break;
     }
@@ -394,13 +396,18 @@ switch (state) {
     case PROGRAM: {
       switch (button.pressed()) {
         case NOT:
-          display.setCursor(0, 24);
-            display.print(gps.hor_acc()); display.print("   ");
+          display.fillRect(0,24,30,8,WHITE);
+          display.setCursor(48, 16);
+          print_signal(); 
+          if (waypoint < 2) {
             display.display();
-          if (waypoint < 2) break;
-          display.setCursor(0, 24);
+            break;
+          }
+          display.fillRect(0,40,42,8,WHITE);
+          display.setCursor(0, 40);
           display.print(distance, 0);
-          display.print("m      ");
+          display.setCursor(42, 40);
+          display.print("m");
           display.display();
           break;
         case LONG:
@@ -478,4 +485,17 @@ void close_lock() {
 int address_for(byte route, byte waypoint) {
   return (route - 1) * 100 + (waypoint - 1) * 10;
 }
+
+int print_signal() {
+  int accuracy = gps.hdop();
+  display.print(
+      accuracy ==   0 ? "none"
+    : accuracy <  300 ? "great"
+    : accuracy <  500 ? "good"
+    : accuracy < 1000 ? "bad"
+    : accuracy < 2000 ? "worst"
+    :                   "none"
+  );
+}
+
 
