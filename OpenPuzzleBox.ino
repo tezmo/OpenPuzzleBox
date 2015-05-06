@@ -11,6 +11,8 @@
 #include <PowerPin.h>
 #include <Button.h>
 
+//test
+
 const byte MAX_WAYPOINT  = 9;
 const byte MAX_ROUTE     = 9;
 const byte TRIES[]       = { 15, 25, 35 };
