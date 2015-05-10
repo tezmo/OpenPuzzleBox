@@ -1,3 +1,11 @@
+/*
+BACKLOG:
+Add signal strength in top right
+stop the marking of a WP when not enough signal strength
+stop downgrading attempt when not enough signla strength
+*/
+
+
 #include "AnythingEEPROM.h"
 #include <EEPROM.h>
 #include <PWMServo.h>
@@ -442,7 +450,7 @@ switch (state) {
     case PROGRAM: {
       switch (button.pressed()) {
         case NOT:
-          display.fillRect(0,24,30,8,WHITE);
+          display.fillRect(0,16,30,8,WHITE);
           display.setCursor(48, 16);
           print_signal(); 
           if (waypoint < 2) {
