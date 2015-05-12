@@ -129,7 +129,7 @@ switch (state) {
     }
     
     case SELECT_ROUTE_UPDATE: {
-      display.fillRect(42,8,6,8,WHITE);
+      display.fillRect(42,8,12,8,WHITE);
       display.setCursor(42,8);
       display.print(route, DEC);
       display.print(" ");
